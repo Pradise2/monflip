@@ -1,0 +1,284 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --border: 214.3 31.8% 91.4%;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+}
+
+.dark {
+  --border: 217.2 32.6% 17.5%;
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Mobile-specific styles */
+@supports (-webkit-touch-callout: none) {
+  /* CSS specific to iOS devices */
+  .wallet-button {
+    padding: 12px 24px;
+    font-size: 16px;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Ensure buttons are tappable on mobile */
+  button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* For Android tap highlight */
+@supports (-webkit-tap-highlight-color: rgba(0, 0, 0, 0)) {
+  .wallet-button, button, [role="button"] {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Prevent text selection on buttons */
+button, [role="button"] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 
+           text-white font-semibold rounded-xl transition-all duration-300 shadow-lg 
+           hover:shadow-purple-500/25 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed 
+           disabled:hover:scale-100;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 text-gray-200 
+           rounded-lg transition-all duration-300 border border-gray-600;
+  }
+
+  .btn-success {
+    @apply px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 
+           text-white font-semibold rounded-xl transition-all duration-300 shadow-lg 
+           hover:shadow-green-500/25 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed 
+           disabled:hover:scale-100;
+  }
+
+  .stat-card {
+    @apply p-4 bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700/50 
+           hover:border-purple-500/30 transition-all duration-300;
+  }
+
+  .game-board {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+}
+
+/* Coin Animation Styles */
+.coin {
+  width: 150px;
+  height: 150px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+  margin: 0 auto;
+  perspective: 1000px;
+  transform: translateZ(0);
+}
+
+.coin-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #d4af37;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.coin-content {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  font-weight: bold;
+}
+
+.heads {
+  transform: rotateY(0deg);
+}
+
+.tails {
+  transform: rotateY(180deg);
+}
+
+.coin.show-heads {
+  transform: rotateY(0deg);
+}
+
+.coin.show-tails {
+  transform: rotateY(180deg);
+}
+
+@keyframes flip {
+  0% { 
+    transform: rotateY(0deg) rotateX(0deg) rotateZ(0deg); 
+    animation-timing-function: cubic-bezier(0.4, 0.1, 0.2, 1);
+  }
+  20% { 
+    transform: rotateY(180deg) rotateX(90deg) rotateZ(30deg);
+    animation-timing-function: cubic-bezier(0.1, 0.8, 0.2, 1);
+  }
+  40% { 
+    transform: rotateY(360deg) rotateX(180deg) rotateZ(0deg);
+    animation-timing-function: cubic-bezier(0.3, 0.1, 0.4, 1);
+  }
+  60% { 
+    transform: rotateY(540deg) rotateX(270deg) rotateZ(-30deg);
+    animation-timing-function: cubic-bezier(0.1, 0.8, 0.2, 1);
+  }
+  80% { 
+    transform: rotateY(720deg) rotateX(360deg) rotateZ(0deg);
+    animation-timing-function: cubic-bezier(0.3, 0.1, 0.4, 1);
+  }
+  90% { 
+    transform: rotateY(810deg) rotateX(360deg) rotateZ(0deg);
+    animation-timing-function: cubic-bezier(0.1, 0.8, 0.2, 1);
+  }
+  100% { 
+    transform: rotateY(900deg) rotateX(360deg) rotateZ(0deg);
+  }
+}
+
+.coin.animate-flip {
+  animation: flip 2.5s ease-in-out;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+/* Glow effects */
+.coin-face::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+  z-index: -1;
+  filter: blur(10px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.coin.animate-flip .coin-face::after {
+  opacity: 0.7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .coin {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .coin-content {
+    font-size: 3rem;
+  }
+}
+
+/* Dark mode overrides */
+.dark {
+  color-scheme: dark;
+}
+
+/* Rotate phone animation */
+@keyframes rock-phone {
+  0%, 100% { 
+    transform: rotate(0deg); 
+  }
+  50% { 
+    transform: rotate(90deg); 
+  }
+}
+
+.rotate-phone {
+  animation: rock-phone 3s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(55, 65, 81, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}
+
+/* Loading spinner for buttons */
+.btn-loading {
+  position: relative;
+  color: transparent;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 50%;
+  left: 50%;
+  margin-left: -10px;
+  margin-top: -10px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Pulse effect for winning streaks */
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
