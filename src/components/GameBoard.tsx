@@ -105,7 +105,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               bg-black/50 backdrop-blur-sm px-[1.5vw] py-[1vw] rounded-full transition-all
               ${!isFlipping && gameState === 'playing' && currentRound < 15 ? 'opacity-100 cursor-pointer hover:bg-black/60' : 'opacity-50 cursor-not-allowed'}`}
             >
-            <span className="text-white text-[1.6vw] font-medium whitespace-nowrap">Heads</span>
+            <span className="text-white text-[1.6vw] font-medium whitespace-nowrap">Mon</span>
           </button>
 
           {/* Character Selection Buttons */}
@@ -143,7 +143,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               bg-black/50 backdrop-blur-sm px-[1.5vw] py-[1vw] rounded-full transition-all
               ${!isFlipping && gameState === 'playing' && currentRound < 15 ? 'opacity-100 cursor-pointer hover:bg-black/60' : 'opacity-50 cursor-not-allowed'}`}
             >
-            <span className="text-white text-[1.6vw] font-medium whitespace-nowrap">Tails</span>
+            <span className="text-white text-[1.6vw] font-medium whitespace-nowrap">Keone</span>
           </button>
 
           {/* Cash Out Button - Always visible, positioned at 20% from left and 30% from bottom */}
