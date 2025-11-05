@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useFlipZoneContract } from './useFlipZoneContract';
 import { ethers } from 'ethers';
+import { generateClientSeed, hashClientSeed } from '../utils/provablyFair';
 
 export type GameState = 'idle' | 'playing' | 'won' | 'lost' | 'loading';
 
@@ -12,11 +13,9 @@ interface GameData {
   multiplier: number;
   potentialWin: number;
   consecutiveWins: number;
-  lastFlip: 'heads' | 'tails' | null;
 }
 
 export const useGame = (signer: ethers.JsonRpcSigner | null) => {
-  // Game state
   const [gameData, setGameData] = useState<GameData>({
     state: 'idle',
     betAmount: '0.1',
@@ -25,279 +24,128 @@ export const useGame = (signer: ethers.JsonRpcSigner | null) => {
     multiplier: 1.0,
     potentialWin: 0,
     consecutiveWins: 0,
-    lastFlip: null
   });
-  
-  // Client seed and pre-calculated flips
-  const [clientSeed, setClientSeed] = useState('');
-  const [preCalculatedFlips, setPreCalculatedFlips] = useState<boolean[]>([]);
-  const [currentFlipIndex, setCurrentFlipIndex] = useState(0);
-  
-  // UI state
+
+  const [clientSeed, setClientSeed] = useState<string>('');
   const [isFlipping, setIsFlipping] = useState(false);
   const [flipResult, setFlipResult] = useState<'heads' | 'tails' | null>(null);
-  const [nextFlipResult, setNextFlipResult] = useState<'heads' | 'tails' | null>(null);
 
-  // Contract hooks
   const {
     currentGameId,
     gameInfo,
     isLoading: contractLoading,
     startGame: contractStartGame,
-    claimReward: contractClaimReward,
-    resetGame: contractResetGame
+    makeFlip: contractMakeFlip,
+    cashOut: contractCashOut,
+    resetGame: contractResetGame,
+    fetchGameInfo,
   } = useFlipZoneContract(signer);
 
-  // Update game state when contract data changes
+  // Sync UI with contract state
   useEffect(() => {
     if (gameInfo && currentGameId) {
-      console.log('[useGame] Game state updated from contract');
+      const multiplier = 1.5 ** gameInfo.consecutiveWins;
+      const potentialWin = parseFloat(gameInfo.betAmount) * multiplier;
+
       setGameData(prev => ({
         ...prev,
         state: gameInfo.active ? 'playing' : 'idle',
-        currentRound: gameInfo.flipsCount || 0,
-        potentialWin: parseFloat(ethers.formatEther(gameInfo.potentialWin.toString()))
+        betAmount: gameInfo.betAmount,
+        currentRound: gameInfo.currentRound,
+        consecutiveWins: gameInfo.consecutiveWins,
+        multiplier,
+        potentialWin,
       }));
+
+      // If game is no longer active and wasn't a win, it's a loss
+      if (!gameInfo.active && prev.state !== 'won' && prev.state !== 'idle') {
+        setGameData(prev => ({ ...prev, state: 'lost' }));
+      }
+
+    } else if (!currentGameId) {
+        // Handle reset or initial state
+        setGameData(prev => ({ ...prev, state: 'idle' }));
     }
   }, [gameInfo, currentGameId]);
 
-  // Start a new game
-  const startGame = useCallback(async (betAmount: string | number, playStartSound?: () => void) => {
+  const startGame = useCallback(async (betAmount: number, playStartSound?: () => void) => {
     if (!signer) throw new Error('Wallet not connected');
+
+    setGameData(prev => ({ ...prev, state: 'loading' }));
     
+    const newClientSeed = generateClientSeed();
+    const clientSeedHash = hashClientSeed(newClientSeed);
+    setClientSeed(newClientSeed);
+
     try {
-      // Ensure betAmount is a string and properly formatted
-      const betAmountStr = typeof betAmount === 'number' ? betAmount.toString() : betAmount;
-      
-      // Set loading state
-      setGameData(prev => ({
-        ...prev,
-        state: 'loading',
-        betAmount: betAmountStr,
-        currentRound: 0,
-        multiplier: 1.0,
-        potentialWin: 0,
-        consecutiveWins: 0,
-        lastFlip: null
-      }));
-      
-      console.log('[useGame] Starting game with bet amount:', betAmountStr);
-      
-      // Start the game with the contract - this will generate and return the client seed
-      const result = await contractStartGame(betAmountStr);
-      
-      if (!result.clientSeed) {
-        throw new Error('Failed to generate client seed');
-      }
-      
-      // Store the client seed for later use in cashout
-      setClientSeed(result.clientSeed);
-      
-      // Pre-calculate all flip results for this game
-      const flips = await generateFlipResults(result.clientSeed);
-      setPreCalculatedFlips(flips);
-      setCurrentFlipIndex(0);
-      
-      // Set the next flip result if we have pre-calculated results
-      if (flips.length > 0) {
-        const nextResult = flips[0] ? 'heads' : 'tails';
-        setNextFlipResult(nextResult);
-      }
-      
-      // Calculate maximum potential win (bet * 4)
-      const maxPotentialWin = parseFloat(betAmountStr) * 4;
-      
-      // Update to playing state
-      setGameData(prev => ({
-        ...prev,
-        state: 'playing',
-        betAmount: betAmountStr,
-        currentRound: 0,
-        multiplier: 1.0,
-        potentialWin: maxPotentialWin, // Set to max potential win from the start
-        consecutiveWins: 0,
-        lastFlip: null
-      }));
-      
-      console.log('[useGame] Game started successfully');
-      
-      // Play start game sound if provided
-      if (playStartSound) {
-        try {
-          playStartSound();
-        } catch (error) {
-          console.warn('Failed to play start sound:', error);
-        }
-      }
-      
+      const result = await contractStartGame(betAmount.toString(), clientSeedHash);
+      playStartSound?.();
+      // State will be updated by the useEffect hook watching gameInfo
       return result;
     } catch (error) {
       console.error('Error starting game:', error);
       setGameData(prev => ({ ...prev, state: 'idle' }));
+      setClientSeed('');
       throw error;
     }
   }, [signer, contractStartGame]);
 
-  // Generate all flip results for the game
-  const generateFlipResults = useCallback(async (clientSeed: string, rounds: number = 15): Promise<boolean[]> => {
-    if (!signer?.provider) return [];
-    
-    const blockNumber = await signer.provider.getBlockNumber();
-    const serverSeed = 'temporary_server_seed_placeholder'; // Replace with actual server seed from contract
-    const results: boolean[] = [];
-    
-    for (let nonce = 0; nonce < rounds; nonce++) {
-      const combined = `${clientSeed}:${serverSeed}:${nonce}:${blockNumber}`;
-      const hash = ethers.keccak256(ethers.toUtf8Bytes(combined));
-      const lastChar = hash.slice(-1);
-      const lastCharValue = parseInt(lastChar, 16);
-      results.push(lastCharValue % 2 === 0);
-    }
-    
-    return results;
-  }, [signer]);
-  
-  // Generate a single flip result for a specific round
-  const generateFlipResult = useCallback((clientSeed: string, serverSeed: string, nonce: number, blockNumber: number): boolean => {
-    const combined = `${clientSeed}:${serverSeed}:${nonce}:${blockNumber}`;
-    const hash = ethers.keccak256(ethers.toUtf8Bytes(combined));
-    const lastChar = hash.slice(-1);
-    const lastCharValue = parseInt(lastChar, 16);
-    return lastCharValue % 2 === 0;
-  }, []);
-
-  // Handle coin flip - returns a promise that resolves when the flip is complete
-  const flipCoin = useCallback(async (chosenSide: 'heads' | 'tails'): Promise<{winner: boolean, side: 'heads' | 'tails'}> => {
-    if (gameData.state !== 'playing' || isFlipping || !currentGameId) {
+  const flipCoin = useCallback(async (chosenSide: 'heads' | 'tails') => {
+    if (gameData.state !== 'playing' || !currentGameId || !clientSeed) {
       throw new Error('Cannot flip in current state');
     }
     
     setIsFlipping(true);
-    
+    setFlipResult(null);
+
     try {
-      // Get the next pre-calculated result
-      if (currentFlipIndex >= preCalculatedFlips.length) {
-        throw new Error('No more pre-calculated flip results');
-      }
+      const choiceIsHeads = chosenSide === 'heads';
+      const result = await contractMakeFlip(currentGameId, clientSeed, choiceIsHeads);
+
+      const outcomeSide = result.outcomeWasHeads ? 'heads' : 'tails';
+      setFlipResult(outcomeSide);
       
-      const isHeads = preCalculatedFlips[currentFlipIndex];
-      const resultSide = isHeads ? 'heads' : 'tails';
-      const isWinner = resultSide === chosenSide;
-      
-      // Set the flip result for animation (but don't update game state yet)
-      setFlipResult(resultSide);
-      
-      // Wait for the next render to ensure the result is set before starting the animation
-      await new Promise(resolve => requestAnimationFrame(resolve));
-      
-      // Update for next flip if there are more flips (but don't update game state yet)
-      const nextIndex = currentFlipIndex + 1;
-      
-      if (nextIndex < preCalculatedFlips.length) {
-        const nextResult = preCalculatedFlips[nextIndex] ? 'heads' : 'tails';
-        setNextFlipResult(nextResult);
-      } else {
-        setNextFlipResult(null);
-      }
-      
-      // Return a promise that resolves with the flip result
-      // The actual game state update will happen when the animation completes
-      return new Promise((resolve) => {
-        // This will be called from the CoinFlip component when animation completes
-        const handleAnimationComplete = () => {
-          // Calculate new game state
-          const newRound = gameData.currentRound + 1;
-          const consecutiveWins = isWinner ? gameData.consecutiveWins + 1 : 0;
-          const baseMultiplier = 1.0 + (consecutiveWins * 0.2);
-          const newMultiplier = isWinner ? Math.min(baseMultiplier, 4.0) : 0;
-          const newPotentialWin = parseFloat(gameData.betAmount) * 4;
-          
-          // Update game state after animation completes
-          setGameData(prev => ({
-            ...prev,
-            state: isWinner ? 'playing' : 'lost',
-            currentRound: newRound,
-            multiplier: isWinner ? newMultiplier : 0,
-            potentialWin: isWinner ? newPotentialWin : 0,
-            lastFlip: resultSide,
-            consecutiveWins: isWinner ? prev.consecutiveWins + 1 : 0
-          }));
-          
-          // Update current flip index for next flip
-          setCurrentFlipIndex(nextIndex);
-          
-          // Resolve the promise with the result
-          resolve({ winner: isWinner, side: resultSide });
+      // onFlipComplete will handle the rest after animation
+      return new Promise<{ winner: boolean, side: 'heads' | 'tails' }>((resolve) => {
+        (window as any).__handleAnimationComplete = () => {
+          if (result.won) {
+            fetchGameInfo(currentGameId); // Refresh state from contract
+          }
+          // The useEffect will catch the state change to 'lost' if !result.won
+          resolve({ winner: result.won, side: outcomeSide });
         };
-        
-        // Store the handler so CoinFlip can call it
-        (window as any).__handleAnimationComplete = handleAnimationComplete;
       });
     } catch (error) {
-      console.error('Error in flip logic:', error);
-      throw error;
-    } finally {
       setIsFlipping(false);
+      console.error('Error making flip:', error);
+      throw error;
     }
-  }, [gameData, isFlipping, currentGameId]);
+  }, [gameData.state, currentGameId, clientSeed, contractMakeFlip, fetchGameInfo]);
 
-  // Cash out current winnings
+  // To be called by CoinFlip component's onFlipComplete
+  const handleFlipAnimationComplete = () => {
+    setIsFlipping(false);
+    if (typeof (window as any).__handleAnimationComplete === 'function') {
+      (window as any).__handleAnimationComplete();
+      delete (window as any).__handleAnimationComplete;
+    }
+  };
+
   const cashOut = useCallback(async () => {
-    if (gameData.state !== 'playing' || gameData.currentRound === 0 || !currentGameId) {
-      console.error('[cashOut] Cannot cash out - invalid game state:', { 
-        state: gameData.state, 
-        currentRound: gameData.currentRound, 
-        currentGameId 
-      });
-      return null;
+    if (gameData.state !== 'playing' || gameData.consecutiveWins === 0 || !currentGameId || !clientSeed) {
+      throw new Error('Invalid state for cash out');
     }
-    
-    if (!clientSeed) {
-      throw new Error('Client seed not found. Cannot cash out.');
-    }
-    
-    try {
-      // Calculate actual win based on current multiplier and bet amount
-      
-      // Only log minimal info before cashout
-      console.log('[Debug] Attempting to cash out...');
 
-      const result = await contractClaimReward(
-        currentGameId,
-        clientSeed,
-        ethers.parseEther((parseFloat(gameData.betAmount) * gameData.multiplier).toString())
-      );
-      
-      // After successful cashout, log all details
-      console.log('[Debug] Cashout successful! Game details:', {
-        gameId: currentGameId,
-        clientSeed: clientSeed,
-        clientSeedHash: ethers.keccak256(ethers.toUtf8Bytes(clientSeed)),
-        betAmount: gameData.betAmount,
-        multiplier: gameData.multiplier,
-        payout: parseFloat(gameData.betAmount) * gameData.multiplier,
-        result: result
-      });
-      
-      // Update local game state
-      setGameData(prev => ({
-        ...prev,
-        state: 'won',
-        currentRound: 0,
-        multiplier: 1.0,
-        potentialWin: 0,
-        consecutiveWins: 0,
-        lastFlip: null
-      }));
-      
+    try {
+      const result = await contractCashOut(currentGameId, clientSeed);
+      setGameData(prev => ({ ...prev, state: 'won' }));
       return result;
     } catch (error) {
       console.error('Error cashing out:', error);
       throw error;
     }
-  }, [contractClaimReward, currentGameId, gameData.state, gameData.currentRound, gameData.potentialWin, clientSeed]);
+  }, [contractCashOut, currentGameId, clientSeed, gameData.state, gameData.consecutiveWins]);
 
-  // Reset the game
   const resetGame = useCallback(() => {
     setGameData({
       state: 'idle',
@@ -307,27 +155,22 @@ export const useGame = (signer: ethers.JsonRpcSigner | null) => {
       multiplier: 1.0,
       potentialWin: 0,
       consecutiveWins: 0,
-      lastFlip: null
     });
     setClientSeed('');
-    setPreCalculatedFlips([]);
-    setCurrentFlipIndex(0);
     setFlipResult(null);
-    setNextFlipResult(null);
     setIsFlipping(false);
     contractResetGame();
-    console.log('[useGame] Game reset complete');
   }, [contractResetGame]);
 
   return {
     gameData,
-    flipResult,
-    nextFlipResult,
     isFlipping,
+    flipResult,
     isLoading: contractLoading,
     startGame,
     flipCoin,
+    handleFlipAnimationComplete, // Pass this down to GameBoard -> CoinFlip
     cashOut,
-    resetGame
+    resetGame,
   };
 };
