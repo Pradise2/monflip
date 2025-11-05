@@ -1,29 +1,7 @@
-export const FLIPZONE_CONTRACT_ADDRESS = "0x4BaD1415212A00F9e50DBcb6bb226c5430B4bb40";
+// IMPORTANT: Deploy the new contract and paste the new address here.
+export const FLIPZONE_CONTRACT_ADDRESS = "0xYourNewDeployedContractAddress";
 
 export const FLIPZONE_ABI = [
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "gameId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
-        "name": "clientSeed",
-        "type": "string"
-      },
-      {
-        "internalType": "uint256",
-        "name": "payout",
-        "type": "uint256"
-      }
-    ],
-    "name": "cashout",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
   {
     "inputs": [],
     "stateMutability": "nonpayable",
@@ -42,18 +20,47 @@ export const FLIPZONE_ABI = [
     "type": "event"
   },
   {
-    "inputs": [],
-    "name": "emergencyWithdraw",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "fundContract",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "gameId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "round",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "choiceWasHeads",
+        "type": "bool"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "outcomeWasHeads",
+        "type": "bool"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "won",
+        "type": "bool"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "consecutiveWins",
+        "type": "uint256"
+      }
+    ],
+    "name": "FlipResult",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -86,11 +93,30 @@ export const FLIPZONE_ABI = [
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "finalAmount",
+        "name": "payout",
         "type": "uint256"
       }
     ],
-    "name": "GameEnded",
+    "name": "GameCashedOut",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "gameId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      }
+    ],
+    "name": "GameLost",
     "type": "event"
   },
   {
@@ -125,71 +151,6 @@ export const FLIPZONE_ABI = [
     "type": "event"
   },
   {
-    "inputs": [],
-    "name": "pauseContract",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "resumeContract",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "gameId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "serverSeed",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "clientSeed",
-        "type": "string"
-      }
-    ],
-    "name": "SeedsRevealed",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "clientSeedHash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "startGame",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "withdraw",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "anonymous": false,
     "inputs": [
       {
@@ -201,10 +162,6 @@ export const FLIPZONE_ABI = [
     ],
     "name": "Withdrawn",
     "type": "event"
-  },
-  {
-    "stateMutability": "payable",
-    "type": "receive"
   },
   {
     "inputs": [
@@ -223,6 +180,48 @@ export const FLIPZONE_ABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_betAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_consecutiveWins",
+        "type": "uint256"
+      }
+    ],
+    "name": "calculateWinnings",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_gameId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_clientSeed",
+        "type": "string"
+      }
+    ],
+    "name": "cashOut",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -264,18 +263,8 @@ export const FLIPZONE_ABI = [
         "type": "bytes32"
       },
       {
-        "internalType": "bytes32",
-        "name": "serverSeed",
-        "type": "bytes32"
-      },
-      {
         "internalType": "uint256",
-        "name": "startBlock",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "flipsCount",
+        "name": "currentRound",
         "type": "uint256"
       },
       {
@@ -287,16 +276,6 @@ export const FLIPZONE_ABI = [
         "internalType": "bool",
         "name": "active",
         "type": "bool"
-      },
-      {
-        "internalType": "uint256",
-        "name": "potentialWin",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "claimed",
-        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -306,19 +285,42 @@ export const FLIPZONE_ABI = [
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "gameId",
+        "name": "_gameId",
         "type": "uint256"
       }
     ],
-    "name": "getGameSeeds",
+    "name": "getPotentialWin",
     "outputs": [
       {
-        "internalType": "bytes32",
-        "name": "serverSeedHash",
-        "type": "bytes32"
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_gameId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_clientSeed",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "_choiceHeads",
+        "type": "bool"
+      }
+    ],
+    "name": "makeFlip",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -336,6 +338,13 @@ export const FLIPZONE_ABI = [
   },
   {
     "inputs": [],
+    "name": "pauseContract",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "paused",
     "outputs": [
       {
@@ -346,5 +355,42 @@ export const FLIPZONE_ABI = [
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "resumeContract",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_clientSeedHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "startGame",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "stateMutability": "payable",
+    "type": "receive"
   }
 ];
